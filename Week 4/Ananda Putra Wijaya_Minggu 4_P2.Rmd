@@ -1,0 +1,442 @@
+---
+title: "Latihan MPDW Minggu 4"
+author: "Ananda Putra Wijaya"
+date: "2024-09-16"
+output: 
+  html_document:
+    theme: cerulean
+    toc: yes
+    toc_float:
+      collapsed: true
+---
+
+```{r}
+library(TSA)
+```
+
+
+# White Noise MA
+
+```{r}
+set.seed(6666)
+wnma <- rnorm(300)
+ts.plot(wnma)
+```
+
+# MA(2)
+
+Model MA(2) akan menggunakan data sebanyak 300 data. Model akan memiliki nilai  $\theta_1 = 0.4$ dan $\theta_2 = 0.6$. Berikut merupakan model MA(2) yang akan digunakan<br>
+
+$$
+y_t = e_t-0.4e_{t-1}-0.6e_{t-2}
+$$
+
+```{r}
+ma<-c(1:300)
+ma[1] <- wnma[1]
+ma[2] <- ma[2] - 0.4 * ma[1]
+```
+
+```{r}
+for(i in 3:300){
+   ma[i] <- wnma[i] - 0.4 * wnma[i - 1] - 0.6 * wnma[i - 2]
+}
+ma
+```
+
+Model MA(2) dapat juga dibangkitkan dengan menggunakan fungsi `arima.sim()`
+
+```{r}
+ma2 <- arima.sim(list(order=c(0,0,2), ma=c(0.4, 0.6)), n=300)
+ma2
+```
+
+## Karakteristik MA(2)
+
+### Plot DW MA(2)
+
+```{r}
+ts.plot(ma)
+```
+
+Plot deret waktu menunjukkan bahwa data MA(2) stasioner pada rataan
+
+### Plot ACF MA(2)
+
+```{r}
+acf(ma,lag.max = 20)
+```
+
+Pada plot AFC model MA(2), terlihat bahwa plot ACF *cuts off* di lag kedua
+
+### Plot PACF MA(2)
+
+```{r}
+pacf(ma)
+```
+
+Berdasarkan plot PACF tersebut, terlihat bahwa plot PACF MA(2) cenderung *tails off* dan membentuk gelombang lembah karena nilai teta adalah positif
+
+### Plot EACF MA(2)
+
+```{r}
+eacf(ma)
+```
+
+Berdasarkan pola segitiga nol pada plot EACF, terlihat bahwa segitiga nol berada pada ordo AR(0) dan ordo MA(2)
+
+### Scatter plot Antar Lag untuk MA(2)
+
+#### $Y_t$ dengan $Y_{t-1}$
+
+```{r}
+yt_ma <- ma[-1]
+yt_ma
+
+yt_1_ma <- ma[-300]
+yt_1_ma
+```
+
+```{r}
+plot(y=yt_ma,x=yt_1_ma)
+```
+
+Scatter plot $Y_t$ dengan $Y_{t-1}$ menunjukkan bahwa terdapat hubungan negatif antara $Y_t$ dengan $Y_{t-1}$.
+
+```{r}
+cor(yt_ma,yt_1_ma)
+```
+
+Nilai korelasi$Y_t$ dengan $Y_{t-1}$ pada hasil simulasi mendekati perhitungan teoritis yaitu
+
+$$
+\rho_1=\frac{-\theta_1+\theta_1\theta_2}{1+\theta_1^2+\theta_2^2}=\frac{-0.4+0.4\times0.6}{1+0.4^2+0.6^2} \approx-0.105
+$$
+
+#### $Y_t$ dengan $Y_{t-2}$
+
+```{r}
+yt_ma2 <- ma[-c(1,2)]
+yt_ma2
+
+yt_2_ma <- ma[-c(299,300)]
+yt_2_ma
+```
+
+```{r}
+plot(y=yt_ma2,x=yt_2_ma)
+```
+
+Scatter plot $Y_t$ dengan $Y_{t-2}$ menunjukkan bahwa terdapat hubungan negatif antara $Y_t$ dengan $Y_{t-2}$.
+
+```{r}
+cor(yt_ma2,yt_2_ma)
+```
+
+Korelasi antara $Y_t$ dengan $Y_{t-2}$ dari hasil simulasi relatif mendekati perhitungan teoritis yaitu
+
+$$
+\rho_2=\frac{-\theta_2}{1+\theta_1^2+\theta_2^2}=\frac{-0.6}{1+0.4^2+0.6^2}\approx-0.394
+$$
+
+#### $Y_t$ dengan $Y_{t-3}$
+
+```{r}
+yt_ma3 <- ma[-c(1,2,3)]
+yt_ma3
+
+yt_3_ma <- ma[-c(288, 299,300)]
+yt_3_ma
+```
+
+```{r}
+plot(y=yt_ma3,x=yt_3_ma)
+```
+
+Scatter plot di atas menggambarkan pola $Y_t$ dan $Y_{t-3}$. Kita dapat lihat bahwa $Y_t$ dan $Y_{t-3}$ tidak menunjukkan pola yang beraturan atau dapat disebut tidak berpola.
+
+```{r}
+cor(yt_ma3,yt_3_ma)
+```
+
+Korelasi antara $Y_t$ dengan $Y_{t-3}$ mendekati nilai teoritis yang menyatakan bahwa $\rho_k=0$ untuk k>q
+
+# White Noise AR
+
+```{r}
+set.seed(1234)
+wnar <- rnorm(300)
+ts.plot(wnar)
+```
+
+# AR(2)
+
+
+Model AR(2) akan menggunakan data sebanyak 300 data. Model akan memiliki nilai  $\phi_1 = 0.5$ dan $\phi_2 = 0.2$. Berikut merupakan model AR(2) yang akan digunakan<br>
+
+$$ Y_t = e_t+0.5Y_{t-1}+0.2Y_{t-2} $$
+
+```{r}
+ar<-c(1:300)
+ar[1] <- wnar[1]
+ar[2] <- wnar[2] + 0.5 * ar[1]
+```
+
+```{r}
+for (i in 3:300) {
+  ar[i] <- wnar[i] + 0.5 * ar[i-1] + 0.2 * ar[i-2]
+}
+ar
+```
+
+Model AR(2) dapat juga dibangkitkan dengan menggunakan fungsi `arima.sim()`
+
+```{r}
+ar2 <- arima.sim(list(order=c(2,0,0), ar=c(0.5,0.2)), n=300)
+ar2
+```
+
+## Karakteristik AR(2)
+
+### Plot DW AR(2)
+
+```{r}
+ts.plot(ar)
+```
+
+Plot deret waktu menunjukkan bahwa data AR(2) stasioner cenderung stasioner pada rataan
+
+### Plot ACF AR(2)
+
+```{r}
+acf(ar)
+```
+
+Berdasarkan plot ACF tersebut terlihat bahwa plot ACF AR(2) cenderung *tails off* 
+
+### Plot PACF AR(2)
+
+```{r}
+pacf(ar)
+```
+
+Berdasarkan plot PACF tersebut, terlihat bahwa plot PACF AR(2) *cuts off* pada lag kedua
+
+### Plot EACF AR(2)
+
+```{r}
+eacf(ar)
+```
+
+Pada plot EACF di atas, terlihat bahwa segitiga nol berada pada ordo AR(2) dan ordo MA(0)
+
+### Scatter plot Antar Lag untuk  AR(2)
+
+#### $Y_t$ dengan $Y_{t-1}$
+
+```{r}
+yt_ar <- ar[-1]
+yt_ar
+
+yt_1_ar <- ar[-300]
+yt_1_ar
+```
+
+```{r}
+plot(y=yt_ar,x=yt_1_ar)
+```
+
+Scatter plot  $Y_t$ dengan $Y_{t-1}$ menunjukkan bahwa terdapat hubungan positif antara $Y_t$ dengan $Y_{t-1}$.
+
+```{r}
+cor(yt_ar,yt_1_ar)
+```
+
+Korelasi antara $Y_t$ dengan $Y_{t-1}$ mendekati perhitungan teoritis yaitu
+
+$$
+\rho_1=\frac{\phi_1}{1-\phi_2}=\frac{0.5}{1-0.2}=0.625
+$$
+
+#### $Y_t$ dengan $Y_{t-2}$
+
+```{r}
+yt_ar2 <- ar[-c(1,2)]
+yt_ar2
+
+yt_2_ar <- ar[-c(299,300)]
+yt_2_ar
+```
+
+```{r}
+plot(y=yt_ar2,x=yt_2_ar)
+```
+
+Scatter plot di atas menunjukkan bahwa terdapat hubungan positif antara $Y_t$ dengan $Y_{t-2}$.
+
+```{r}
+cor(yt_ar2,yt_2_ar)
+```
+
+Korelasi antara $Y_t$ dengan $Y_{t-2}$ mendekati perhitungan teoritis yaitu
+
+$$
+\rho_2=\phi_1\rho_{k-1}+\phi_2\rho_{k-2}=\frac{\phi_2(1-\phi_2)+\phi_1^2}{1-\phi_2}=\frac{0.2(1-0.2)+0.5^2}{1-0.2}=0.5125
+$$
+
+#### $Y_t$ dengan $Y_{t-3}$
+
+```{r}
+yt_ar3 <- ar[-c(1,2,3)]
+yt_ar3
+
+yt_3_ar <- ar[-c(298,299,300)]
+yt_3_ar
+```
+
+```{r}
+plot(y=yt_ar3,x=yt_3_ar)
+```
+
+Berdasarkan Scatter plot tersebut, terlihat bahwa terdapat hubungan positif antara $Y_t$ dengan $Y_{t-3}$.
+
+```{r}
+cor(yt_ar3,yt_3_ar)
+```
+
+Korelasi antara $Y_t$ dengan $Y_{t-3}$ mendekati perhitungan teoritis yaitu
+
+$$
+\rho_3=\phi_1\rho_{k-1}+\phi_2\rho_{k-2}=\phi_1\rho_2+\phi_2\rho_1=0.5\times0.5125+0.2\times0.625=0.38125
+$$
+
+# White Noise ARMA
+
+```{r}
+set.seed(1241)
+wnarma <- rnorm(300)
+ts.plot(wnarma)
+```
+
+# ARMA(2,2)
+
+Model ARMA(2,2) akan menggunakan data sebanyak 300 data. Model akan memiliki nilai  $\phi_1 = 0.5$, $\phi_2 = 0.2$, $\theta_1 = 0.4$ dan $\theta_2 = 0.6$. Berikut merupakan model ARMA(2,2) yang akan digunakan<br>
+
+$$ Y_t = 0.5Y_{t-1}+0.2Y_{t-2}+e_t-0.4_{t-1}-0.6_{t-2} $$
+
+```{r}
+phi1 = 0.5
+phi2 = 0.2
+theta1 = 0.4
+theta2 = 0.6
+
+y.arma=c(1:300)
+for (i in 3:300){y.arma[i] = phi1*y.arma[i-1] + phi2*y.arma[i-2] +
+                 wnarma[i] - theta1*wnarma[i-1] - theta2*wnarma[i-2]}
+y.arma
+```
+
+Model ARMA(2,2) dapat juga dibangkitkan dengan menggunakan fungsi `arima.sim()`
+
+```{r}
+arma22 <- arima.sim(list(order=c(2,0,2), ar = c(0.5,0.2), ma = c(0.4,0.6)), n=300)
+arma22
+```
+
+## Karakteristik ARMA(2,2)
+
+### Plot DW ARMA(2,2)
+
+```{r}
+ts.plot(y.arma)
+```
+
+Plot deret waktu menunjukkan bahwa data ARMA(2,2) stasioner pada rataan
+
+### Plot ACF ARMA(2,2)
+
+```{r}
+acf(y.arma)
+```
+
+Plot ACF menunjukkan bahwa model ARMA(2,2) memiliki plot ACF yang *tails off*
+
+### Plot PACF ARMA(2,2)
+
+```{r}
+pacf(y.arma)
+```
+
+Plot PACF menunjukkan bahwa model ARMA(2,2) memiliki plot PACF yang *tails off* juga
+
+
+### Plot EACF ARMA(2,2)
+
+```{r}
+eacf(y.arma)
+```
+
+Plot EACF memperlihatkan bahwa pola segitiga nol berada pada ordo AR(2) dan ordo MA(2)
+
+### Scatter plot Antar Lag untuk ARMA(2,2)
+
+#### $Y_t$ dengan $Y_{t-1}$
+
+```{r}
+yt_arma <- y.arma[-1]
+yt_arma
+
+yt_1_arma <- y.arma[-300]
+yt_1_arma
+```
+
+```{r}
+plot(y=yt_arma,x=yt_1_arma)
+```
+
+Berdasarkan Scatter plot tersebut, terlihat bahwa terdapat hubungan positif antara $Y_t$ dengan $Y_{t-1}$.
+
+```{r}
+cor(yt_arma,yt_1_arma)
+```
+
+
+#### $Y_t$ dengan $Y_{t-2}$
+
+```{r}
+yt_arma <- y.arma[-c(1,2)]
+yt_arma
+
+yt_2_arma <- y.arma[-c(299,300)]
+yt_2_arma
+```
+
+```{r}
+plot(y=yt_arma,x=yt_2_arma)
+```
+
+Berdasarkan Scatter plot tersebut, terlihat bahwa terdapat hubungan negatif antara $Y_t$ dengan $Y_{t-2}$.
+
+```{r}
+cor(yt_arma,yt_2_arma)
+```
+
+#### $Y_t$ dengan $Y_{t-3}$
+
+```{r}
+yt_arma <- y.arma[-c(1,2,3)]
+yt_arma
+
+yt_3_arma <- y.arma[-c(298,299,300)]
+yt_3_arma
+```
+
+```{r}
+plot(y=yt_arma,x=yt_3_arma)
+```
+
+Berdasarkan Scatter plot tersebut, terlihat bahwa terdapat hubungan negatif antara $Y_t$ dengan $Y_{t-3}$.
+
+```{r}
+cor(yt_arma,yt_3_arma)
+```
