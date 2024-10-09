@@ -1,0 +1,21 @@
+data2<-read.delim("clipboard")
+model.reg<-lm(Yt~Y.t.1.+Xt,data=data2)
+model.reg
+
+install.packages("dLagM")
+library("dLagM")
+data<-read.delim("clipboard")
+model.koyck=koyckDlm(x=data$Xt, y=data$Yt)
+
+
+data("USMacroG",package="AER")
+plot(USMacroG[,c("dpi","consumption")],lty=c(3,1),lwd=2,plot.type="single",ylab="")
+legend("topleft", legend=c("income","consumption"),lwd=2,lty=c(3,1),bty="n")
+
+library("dynlm")
+cons_lm1<-dynlm(consumption~dpi+L(dpi),data=USMacroG)
+cons_lm2<-dynlm(consumption~dpi+L(consumption),data=USMacroG)
+summary(cons_lm1)
+summary(cons_lm2)
+deviance(cons_lm1)
+deviance(cons_lm2)

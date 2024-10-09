@@ -1,0 +1,252 @@
+---
+title: "Project Week 6"
+author: "Ananda Putra Wijaya/G1401221111"
+date: "2024-09-29"
+output:
+  html_document:
+    theme: simplex
+    toc: yes
+    toc_float:
+      collapsed: true
+  pdf_document: default
+---
+# Library
+
+```{r}
+library(ggplot2)
+library(tsibble)
+library(tseries)
+library(MASS)
+library(forecast)
+library(TSA)
+library(TTR)
+library(aTSA)
+library(graphics)
+library(readxl)
+library(tseries)
+```
+
+# Inisiasi Data
+
+```{r}
+data=read.csv("C:/Tugas/Semester 5/Metode Peramalan Deret Waktu/Minggu 6/Data Project Week 6.csv")
+dts=ts(data$Jumlah)
+dts
+```
+
+## Eksplorasi Data penuh
+
+### Plot Penuh
+
+```{r}
+plot.ts(dts, lty=1, xlab="Waktu", ylab="Junlah", main="Plot Data Penuh")
+```
+
+Berdasarkan plot deret waktu di atas, terlihat bahwa data cenderung memiliki pola musiman yang tidak stasioner dalam rataan. Selanjutnya akan dilakukan pembagian data latih dan data uji ditetapkan dengan proporsi 66%:34%.
+
+### Plot Latih
+
+```{r}
+latts=dts[1:66]
+plot.ts(latts)
+```
+
+Data latih terlihat memiliki kecenderungan stasioner dalam ragam namun tidak stasioner dalam rataan.
+
+### Plot Uji
+
+```{r}
+ujits=dts[67:100]
+plot.ts(ujits)
+```
+
+Data uji menunjukkan kecenderungan stasioner dalam rataan namun tidak stasioner dalam ragam.
+
+# Uji Kestasioneran data
+
+## Plot ACF
+
+```{r}
+acf(latts)
+```
+
+Plot ACF di atas menunjukkan bahwa data latih tidak *tails of slowly*. 
+
+## Uji ADF
+
+```{r}
+tseries::adf.test(latts)
+```
+$H_0$ : Data tidak stasioner dalam rataan
+
+$H_1$ : Data stasioner dalam rataan
+
+Nilai p yang didapat adalah 0.4, yang mana lebih dari 0.05, artinya tak tolak H0. Maka data latih tidak stasioner dalam rataan. Hal ini sesuai dengan eksplorasi plot deret waktu dan plot ACF.
+
+## Plot Box-Cox
+
+```{r}
+index <- seq(1:66)
+bc = boxcox(latts~index, lambda = seq(0,3,by=1))
+#Nilai Rounded Lambda
+lambda <- bc$x[which.max(bc$y)]
+lambda
+#SK
+bc$x[bc$y > max(bc$y) - 1/2 * qchisq(.95,1)]
+```
+
+Berdasarkan plot Box-Cox di atas, dapat dilihat bahwa nilai 1 masuk dalam selang kepercayaan 95% dengan batas bawah 0.757 dan batas atas 1.424. Nilai $\lambda$ optimal yang didapat adalah 1.0909. Karena selang plot Box-Cox memuat nilai 1, maka data latih dapat dikatakan stasioner dalam ragam.
+
+# Penanganan Ketidak Stasioneran
+
+## Differencing
+
+```{r}
+latdif <- diff(latts,differences = 1) 
+plot.ts(latdif, lty=1, xlab="Waktu", ylab="Difference 1 Jumlah", main="Plot Difference Jumlah")
+```
+
+Plot di atas memperlihatkan bentuk data latih yang sudah melalui proses *differencing*. Data terlihat sudah stasioner rataan karena data bergerak pada nilai tengah tertentu.
+
+## Plot ACF
+
+```{r}
+acf(latdif)
+```
+
+Berdasarkan plot di atas, data latih yang sudah di*differencing* tidak *tails of slowly*. Artinya data mungkin sudah stasioner dalam rataan. Selanjutnya akan dilakukan uji ADF untuk data latih yang sudah di*differencing*.
+
+## Uji ADF
+
+```{r}
+tseries::adf.test(latdif)
+```
+
+$H_0$ : Data tidak stasioner dalam rataan
+
+$H_1$ : Data stasioner dalam rataan
+
+Nilai p pada uji ADF untuk data latih yang sudah di*differencing* adalah 0,01. Artinya tolak H0, data stasioner dalam rataan. Karena ketidakstasioneran data sudah tertangani, selanjutnya akan dilakukan proses identifikasi model. 
+
+# Identifikasi Model
+
+## Plot ACF
+
+```{r}
+acf(latdif)
+```
+Plot ACF data latih yang sudah di*differencing* menunjukkan bahwa data *tails of*. Jika dipandang plot ACF *cuts of* pada lag pertama, maka model yang dapat dibentuk adalah **ARIMA(0,1,1)**
+
+## Plot PACF
+
+```{r}
+pacf(latdif)
+```
+
+Plot PACF data latih yang sudah di*differencing* menunjukkan *tails of*
+
+Karena plot ACF dan PACF data latih yang sudah di*differencing* menunjukkan *tails of*, maka kemungkinan model yang dapat terbentuk adalah **ARIMA(1,1,1)**. 
+
+Jika kita melihat plot PACF *cuts of* pada lag ke 2, maka model yang dapat terbentuk adalah **ARIMA(2,1,0)**
+
+## Plot EACF
+
+```{r}
+eacf(latdif)
+```
+
+Plot EACF menunjukkan pola segitiga nol pada model **ARIMA(1,1,2)**,**ARIMA(3,1,4)** dan **ARIMA(4,1,5)**.
+
+# Pendugaan parameter tentatif
+
+Dugaan model yang dapat terbentuk adalah **ARIMA(0,1,1)**,  **ARIMA(1,1,1)**,**ARIMA(1,1,2)**, **ARIMA(2,1,0)**,  **ARIMA(3,1,4)**, dan **ARIMA(4,1,5)**.
+
+## ARIMA(0,1,1)
+
+```{r}
+model1.da=Arima(latts, order=c(0,1,1),method="ML")
+summary(model1.da)
+lmtest::coeftest(model1.da)
+```
+
+## ARIMA(1,1,1)
+
+```{r}
+model2.da=Arima(latts, order=c(1,1,1),method="ML")
+summary(model2.da)
+lmtest::coeftest(model2.da)
+```
+
+## ARIMA(1,1,2)
+
+```{r}
+model3.da=Arima(latts, order=c(1,1,2),method="ML")
+summary(model3.da)
+lmtest::coeftest(model3.da)
+```
+
+## ARIMA(2,1,0)
+
+```{r}
+model4.da=Arima(latts, order=c(2,1,0),method="ML")
+summary(model4.da)
+lmtest::coeftest(model4.da)
+```
+
+
+
+## ARIMA(3,1,4)
+
+```{r}
+model5.da=Arima(latts, order=c(3,1,4),method="ML")
+summary(model5.da)
+lmtest::coeftest(model5.da)
+```
+
+## ARIMA(4,1,5)
+
+```{r}
+model6.da=Arima(latts, order=c(4,1,5),method="ML")
+summary(model6.da)
+lmtest::coeftest(model6.da)
+```
+
+## Nilai AIC 
+
+```{r}
+cat("AIC Model ARIMA (0,1,1) :", model1.da$aic,
+    "\nAIC Model ARIMA (1,1,1) :", model2.da$aic,
+    "\nAIC Model ARIMA (1,1,2) :", model3.da$aic,
+    "\nAIC Model ARIMA (2,1,0) :", model4.da$aic,
+    "\nAIC Model ARIMA (3,1,4) :", model5.da$aic,
+    "\nAIC Model ARIMA (4,1,5) :", model6.da$aic)
+```
+
+Model yang akan dipilih adalah model **ARIMA(2,1,0)**. Walau memiliki nilai AIC paling besar, namun semua parameter pada model ARIMA(2,1,0) signifikan pada taraf nyata 95%.
+
+```{r}
+lmtest::coeftest(model4.da)
+```
+
+# Overfitting
+
+Selanjutnya pemeriksaan model *overfitting* dari ARIMA(2,1,0), yakni ARIMA(3,1,0) dan ARIMA(2,1,1).
+
+## ARIMA(3,1,0)
+
+```{r}
+model7.da=Arima(latts, order=c(3,1,0),method="ML")
+summary(model7.da)
+lmtest::coeftest(model7.da)
+```
+## ARIMA(2,1,1)
+
+```{r}
+model8.da=Arima(latts, order=c(2,1,1),method="ML")
+summary(model8.da)
+lmtest::coeftest(model8.da)
+```
+
+## Kesimpulan Overfitting
+
+Model yang dipilih adalah ARIMA(2,1,0). Hal ini dikarenakan semua koefisien parameter pada model ini signifikan pada taraf nyata 95%. Lain halnya dengan model overfitting ARIMA(2,1,1) yang hanya memiliki satu parameter yang signifikan dan ARIMA(3,1,0) yang parameternya tidak signifikan pada taraf nyata 95%.

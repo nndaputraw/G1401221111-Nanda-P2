@@ -1,0 +1,186 @@
+---
+title: "Tugas Minggu 5"
+author: "Ananda Putra Wijaya/G1401221111"
+date: "2024-09-20"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+# Inisiasi Library
+
+```{r}
+library(ggplot2)
+library(tsibble)
+library(tseries)
+library(MASS)
+library(tseries)
+library(readxl)
+```
+
+# Inisiasi Data
+
+```{r}
+index=seq(1:100)
+index150=seq(1:50)
+index51100=seq(from=51,to=100,by=1)
+datafull=read.csv("C:/Tugas/Semester 5/Metode Peramalan Deret Waktu/Minggu 5/Data Project Week 5.csv")
+data100=ts(datafull[,2])
+data150=ts(datafull[1:50,2])
+data51100=ts(datafull[51:100,2])
+```
+
+# Data Full
+
+## Time Series Plot
+
+```{r}
+plot_data100 <- data100 |> as_tsibble() |> 
+  ggplot(aes(x = index, y = value)) + geom_line() + theme_bw() + geom_hline(yintercept = mean(data100), linetype = "dotted", color = "red", size = 1)+
+  xlab("Obs") + ylab("Jumlah")
+plot_data100
+mean(data100)
+```
+
+Plot deret waktu di atas menunjukkan bahwa data penuh tampak **stasioner dalam rataan**, yang ditandai dengan data yang menyebar di sekitar nilai tengah. Namun **tidak stasioner dalam ragam** karena lebar pitanya cenderung tidak sama.
+
+## ACF Plot
+
+```{r}
+acf(data100)
+```
+
+Plot ACF data penuh menunjukkan data penuh cenderung *tails off*
+
+## ADF Test
+
+```{r}
+adf.test(data100)
+```
+
+$H_0$ : Data tidak stasioner dalam rataan
+
+$H_1$ : Data stasioner dalam rataan
+
+Berdasarkan *p-value* dari uji ADF pada data penuh(0.05645), keputusan yang diambil adalah **tak tolak H0**, artinya data **tidak stasioner dalam rataan**.
+
+## Box-Cox Plot
+
+```{r}
+bc100 = boxcox(data100~index, lambda = seq(0,4,by=0.01))
+#Nilai Rounded Lambda
+lambda <- bc100$x[which.max(bc100$y)]
+lambda
+#SK
+bc100$x[bc100$y > max(bc100$y) - 1/2 * qchisq(.95,1)]
+```
+
+Plot *Box-Cox* di atas menunjukkan nilai ($\lambda$) optimum sebesar **1,03** dan pada selang kepercayaan 95% nilai memiliki batas bawah **0,76** dan batas atas **1.32**. Selang tersebut memuat nilai satu sehingga dapat dikatakan bahwa data penuh **stasioner dalam ragam**.
+
+# Data 1 sampai 50
+
+## Time Series Plot
+
+```{r}
+plot_data150 <- data150 |> as_tsibble() |> 
+  ggplot(aes(x = index, y = value)) + geom_line() + theme_bw() + geom_hline(yintercept = mean(data150), linetype = "dotted", color = "red", size = 1) + xlab("Obs") + ylab("Jumlah")
+plot_data150
+mean(data150)
+```
+
+Plot deret waktu di atas menunjukkan bahwa data index 1 sampai 50 tampak **stasioner dalam rataan**, yang ditandai dengan data yang menyebar di sekitar nilai tengah. Namun **tidak stasioner dalam ragam** karena lebar pitanya cenderung tidak sama.
+
+## ACF Plot
+
+```{r}
+acf(data150)
+```
+
+Plot ACF data index 1 sampai 50 menunjukkan data penuh cenderung *tails off*
+
+## ADF Test
+
+```{r}
+adf.test(data150)
+```
+
+$H_0$ : Data tidak stasioner dalam rataan
+
+$H_1$ : Data stasioner dalam rataan
+
+Berdasarkan *p-value* dari uji ADF pada data index 1-50(0.08159), keputusan yang diambil adalah **tak tolak H0**, artinya data **tidak stasioner dalam rataan**.
+
+## Box-Cox Plot
+
+```{r}
+bc150 = boxcox(data150~index150, lambda = seq(0,4,by=0.01))
+#Nilai Rounded Lambda
+lambda <- bc150$x[which.max(bc150$y)]
+lambda
+#SK
+bc150$x[bc150$y > max(bc150$y) - 1/2 * qchisq(.95,1)]
+```
+
+Plot *Box-Cox* di atas menunjukkan nilai ($\lambda$) optimum sebesar **0.97** dan pada selang kepercayaan 95% nilai memiliki batas bawah **0,57** dan batas atas **1.39**. Selang tersebut memuat nilai satu sehingga dapat dikatakan bahwa data index 1 sampai 50 **stasioner dalam ragam**.
+
+# Data 51 sampai 100
+
+## Time Series Plot
+
+```{r}
+plot_data51100 <- data51100 |> as_tsibble() |> 
+  ggplot(aes(x = index, y = value)) + geom_line() + theme_bw() +  geom_hline(yintercept = mean(data51100), linetype = "dotted", color = "red", size = 1) +   xlab("Obs") + ylab("Jumlah")
+plot_data51100
+mean(data51100)
+```
+
+Plot deret waktu di atas menunjukkan bahwa data index tampak **stasioner dalam rataan**, yang ditandai dengan data yang menyebar di sekitar nilai tengah. Namun **tidak stasioner dalam ragam** karena lebar pitanya cenderung tidak sama.
+
+## ACF Plot
+
+```{r}
+acf(data51100)
+```
+
+Plot ACF data penuh menunjukkan data penuh cenderung *tails off*
+
+## ADF Test
+
+```{r}
+adf.test(data51100)
+```
+
+$H_0$ : Data tidak stasioner dalam rataan
+
+$H_1$ : Data stasioner dalam rataan
+
+Berdasarkan *p-value* dari uji ADF pada data index 51-100(0.01), keputusan yang diambil adalah **tolak H0**, artinya data **stasioner dalam rataan**.
+
+## Box-Cox Plot
+
+```{r}
+bc51100 = boxcox(data51100~index51100, lambda = seq(0,4,by=0.01))
+#Nilai Rounded Lambda
+lambda <- bc51100$x[which.max(bc51100$y)]
+lambda
+#SK
+bc51100$x[bc51100$y > max(bc51100$y) - 1/2 * qchisq(.95,1)]
+```
+
+Plot *Box-Cox* di atas menunjukkan nilai ($\lambda$) optimum sebesar **2.08** dan pada selang kepercayaan 95% nilai memiliki batas bawah **1.44** dan batas atas **2.81**. Selang tersebut **tidak**  memuat nilai satu sehingga dapat dikatakan bahwa data index 51-100 **tidak stasioner dalam ragam**.
+
+# Kesimpulan Panjang
+
+Berdasarkan plot deret waktu, ketiga set data(data penuh(index 1-100), data index 1-50, dan data index 51-100)) cenderung stasioner dalam rataan namun tidak stasioner dalam ragam.<br>
+
+Berdasarkan plot ACF, ketiga set data(data penuh(index 1-100), data index 1-50, dan data index 51-100)) cenderung *tails off*.<br>
+
+Berdasarkan uji ADF, data penuh dan data index 1-50 memiliki *p-value* lebih dari taraf nyata 0.05(5%), artinya kedua set data tidak stasioner dalam rataan. Namun data index 51-100 memiliki *p-value* kurang dari taraf nyata 0.05(5%), artinya data index 51-100 stasioner dalam rataan.<br>
+
+Berdasarkan plot *Box-Cox*,  data penuh dan data index 1-50 memuat nilai satu pada selang batas bawah dan batas atas plot *Box-Cox*-nya. Artinya kedua set data ini stasioner dalam ragam. Namun data index 51-100 tidak memuat nilai satu pada selang plot *Box-Cox*-nya, artinya data index 51-100 tidak stasioner dalam ragam.<br>
+
+# Kesimpulan Pendek
+
+Data penuh(1-100) *tails off* dari plot ACFnya, tidak stasioner dalam rataan, dan stasioner dalam ragam.<br>
+Data index 1-50 *tails off* dari plot ACFnya, tidak stasioner dalam rataan, dan stasioner dalam ragam.<br>
+Data index 51-100 *tails off* dari plot ACF, stasioner dalam rataan, dan tidak stasioner dalam ragam.<br>
