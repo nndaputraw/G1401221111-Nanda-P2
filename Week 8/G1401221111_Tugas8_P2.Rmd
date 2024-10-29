@@ -1,0 +1,385 @@
+---
+title: "Tugas Pertemuan 8"
+author: "Ananda Putra Wijaya/G1401221111"
+date: "2024-10-27"
+output: 
+  rmdformats::html_clean
+---
+
+# Inisiasi Library
+
+```{r}
+library(ggplot2)
+library(tidyverse)
+library(tsibble)
+library(tseries)
+library(MASS)
+library(readxl)
+library(forecast)
+library(TSA)
+library(TTR)
+library(aTSA)
+library(graphics)
+library(lmtest)
+library(car)
+library(portes)
+library(plotly)
+```
+
+# Inisiasi Data
+
+```{r}
+mrt=read_xlsx("C:/Tugas/Semester 5/Metode Peramalan Deret Waktu/Minggu 8/Data Pertemuan 8.xlsx")
+mrt=ts(mrt[,2], frequency = 7)
+```
+
+Data yang digunakan adalah data harian jumlah penumpang MRT Stasiun Dukuh Atas BNI City. Data dimulai dari periode 1 Januari 2023 sampai 16 Juli 2023, sebanyak 197 data. Data diambil dari laman SIASATI.
+
+
+# Plot Data Penuh
+
+## Time Series Plot
+
+```{r}
+tanggal <- seq(as.Date("2023-01-01"), as.Date("2023-07-16"), by = "day")
+plot(tanggal, mrt, type = "l", 
+     main = "Plot Jumlah Penumpang Harian MRT Dukuh Atas",
+     ylab = "Jumlah Penumpang", 
+     xlab = "Tanggal",
+     xaxt = "n")
+axis_dates <- seq(min(tanggal), max(tanggal), by = "1 months")
+points(tanggal, mrt, pch = 1, cex = 1)
+axis(1, at = axis_dates, labels = format(axis_dates, "%d-%b-%Y"), las = 1, cex.axis = 0.8)
+abline(h = mean(mrt), col = "red", lwd = 2, lty = 3)
+```
+
+Dari plot *time series* di atas, dapat dilihat bahwa data penuh cenderung stasioner ragam dan rataan. Perlu dilakukan uji formal untuk menentukan kestasioneritasan data.
+
+## Decompose Plot
+
+```{r}
+plot(decompose(mrt))
+```
+
+Plot dekomposisi di atas menunjukkan bahwa data yang dipakai memiliki komponen musiman, dengan "Minggu" sebagai musimnya.
+
+## Seasonal Plot
+
+```{r}
+seasonplot(mrt,7,main="Plot Seasonal Data Pengguna MRT St. Dukuh Atas 2023", ylab="Jumlah Pengguna", xlab ="Hari",
+           year.labels = T, col=rainbow(18))
+```
+
+Berdasarkan *Seasonal Plot* di atas, dapat kita lihat bahwa hari kerja(*weekday*) merupakan hari tersibuk Stasiun MRT Dukuh Atas. Pada hari Sabtu dan Minggu(*weekend*), terdapat penurunan yang signifikan terhadap pengguna Stasiun MRT Dukuh Atas.
+
+# Pembagian Data Latih dan Data Uji
+
+```{r}
+mrtlat=ts(mrt[1:152])
+mrtlatts = subset(mrt, start=1, end=152)
+mrtuji=ts(mrt[153:197])
+mrtujits = subset(mrt, start=153, end = 197)
+```
+
+# Data Latih
+
+## Plot Data Latih
+
+```{r}
+tgllat <- seq(as.Date("2023-01-01"), as.Date("2023-06-1"), by = "day")
+plot(tgllat, mrtlatts, type = "l", 
+     main = "Plot Data Latih Jumlah Penumpang Harian MRT Dukuh Atas",
+     ylab = "Jumlah Penumpang", 
+     xlab = "Tanggal",
+     xaxt = "n")
+axis_dates <- seq(min(tgllat), max(tgllat), by = "1 months")
+points(tgllat, mrtlatts, pch = 1, cex = 1)
+axis(1, at = axis_dates, labels = format(axis_dates, "%d-%b-%Y"), las = 1, cex.axis = 0.8)
+abline(h = mean(mrtlatts), col = "red", lwd = 2, lty = 3)
+```
+
+Plot data latih menunjukkan bahwa data latih tampak stasioner ragam dan rataan.
+
+## Rataan
+
+### ADF Test
+
+```{r}
+tseries::adf.test(mrtlatts)
+```
+
+$H_0$ : Data tidak stasioner dalam rataan
+
+$H_1$ : Data stasioner dalam rataan
+
+Dari uji ADF yang dilakukan, didapat nilai p sebesar 0.055, artinya tak tolak H0. Maka data latih tidak stasioner dalam rataan.
+
+### ACF Plot
+
+```{r}
+acf0=acf(mrtlatts, lag.max = 28, xaxt="n", main="Plot ACF Data Latih")
+axis(1, at=0:28, labels=0:28)
+```
+
+Dapat kita lihat bahwa komponen *seasonal* atau musiman pada data latih kita memiliki *lag* yang *tails of slowly*, sedangkan komponen non-*seasonal*nya *cuts of*. Maka kita dapat menyatakan bahwa komponen *seasonal* tidak stasioner dalam ragam, namun komponen non-*seasonal*nya stasioner dalam ragam.
+
+## Ragam
+
+```{r}
+index <- seq(1:152)
+bc1 = boxcox(mrtlatts~index, lambda = seq(-2,10,by=0.1))
+optlambda <- bc1$x[which.max(bc1$y)]
+optlambda
+
+#SK
+bc1$x[bc1$y > max(bc1$y) - 1/2 * qchisq(.95,1)]
+```
+
+Berdasarkan plot *Box-Cox* di atas, dapat kita lihat bahwa nilai 1 tidak masuk ke dalam selang kepercayaan 95%. Artinya data latih tidak stasioner dalam ragam.
+
+# Penanganan Ragam
+
+```{r}
+mrtlattsbc=(mrtlatts^2-1)/2
+tbc = boxcox(mrtlattsbc~index, lambda = seq(-1,3,by=0.1))
+```
+
+Setelah selesai melakukan transformasi *Box-Cox*, data latih sudah stasioner ragam, karena nilai 1 sudah masuk ke dalam selang 95%. Selanjutnya akan dilakukan *differencing* pada komponen *seasonal* data latih.
+
+# Penanganan Rataan Seasonal
+
+```{r}
+diffbcmrt <- diff(mrtlatts,7)
+ts.plot(diffbcmrt, type="l", ylab="D1 Xt", col="blue")
+```
+
+```{r}
+acfD=acf(diffbcmrt, lag.max = 28, xaxt="n", main="Plot ACF Data Latih")
+axis(1, at=0:28, labels=0:28)
+```
+
+Komponen *Seasonal* pada data latih sudah stasioner dalam rataan. Langkah selanjutnya adalah pendugaan parameter tentatif.
+
+# Identifikasi Model
+
+## Plot ACF
+
+```{r}
+acfD=acf(diffbcmrt, lag.max = 28, xaxt="n", main="Plot ACF Differenced Transformed Data Latih")
+axis(1, at=0:28, labels=0:28)
+```
+
+Berdasarkan plot ACF di atas, komponen non-*seasonal cuts of* pada lag 2(q=2), sedangkan komponen *seasonal cuts of* pada lag 1(Q=1).
+
+## Plot PACF
+
+```{r}
+pacfD=pacf(diffbcmrt, lag.max = 28, xaxt="n", main="Plot PACF Differenced Transformed Data Latih")
+axis(1, at=0:28, labels=0:28)
+```
+
+Plot PACF menunjukkan bahwa komponen non-*seasonal cuts of* pada lag 1(p=1) dan komponen *seasonal tails of* (P=0).
+
+Berdasarkan plot ACF dan PACF, model tentatif yang terbentuk adalah $ARIMA(0,0,2)\times(0,1,1)_{7}$, $ARIMA(1,0,0)\times(0,1,1)_{7}$, $ARIMA(1,0,2)\times(0,1,1)_{7}$.
+
+## Plot EACF
+
+```{r}
+TSA::eacf(diffbcmrt)
+```
+
+Berdasarkan plot EACF di atas, model tentatif yang dapat terbentuk lagi adalah $ARIMA(1,0,1)\times(0,1,1)_{7}$, $ARIMA(2,0,2)\times(0,1,1)_{7}$, $ARIMA(1,0,3)\times(0,1,1)_{7}$.
+
+
+
+# Pendugaan Parameter Tentatif
+
+## ARIMA(0,0,2)(0,1,1)[7] 
+
+```{r}
+mod1 = Arima(mrtlattsbc,order=c(0,0,2),seasonal=c(0,1,1))
+summary(mod1)
+lmtest::coeftest(mod1)
+```
+
+
+## ARIMA(1,0,0)(0,1,1)[7] 
+
+```{r}
+mod2 = Arima(mrtlattsbc,order=c(1,0,0),seasonal=c(0,1,1))
+summary(mod2)
+lmtest::coeftest(mod2)
+```
+
+
+## ARIMA(1,0,2)(0,1,1)[7] 
+
+```{r}
+mod3 = Arima(mrtlattsbc,order=c(1,0,2),seasonal=c(0,1,1))
+summary(mod3)
+lmtest::coeftest(mod3)
+```
+
+
+## ARIMA(1,0,1)(0,1,1)[7] 
+
+```{r}
+mod4 = Arima(mrtlattsbc,order=c(1,0,1),seasonal=c(0,1,1))
+summary(mod4)
+lmtest::coeftest(mod4)
+```
+
+
+## ARIMA(2,0,2)(0,1,1)[7] 
+
+```{r}
+mod5 = Arima(mrtlattsbc,order=c(2,0,2),seasonal=c(0,1,1))
+summary(mod4)
+lmtest::coeftest(mod5)
+```
+
+
+## ARIMA(1,0,3)(0,1,1)[7] 
+
+```{r}
+mod6 = Arima(mrtlattsbc,order=c(1,0,3),seasonal=c(0,1,1))
+summary(mod6)
+lmtest::coeftest(mod6)
+```
+
+## Perbandingan Model
+
+Perbandingan hanya dilakukan pada model yang semua parameternya signifikan.
+
+```{r}
+nilaiAIC <- c(mod1$aic, mod2$aic)
+Model.Tentatif <- c("SARIMA(0,0,2)(0,1,1)7", "SARIMA(1,0,0)(0,1,1)7")
+PerbandinganModel <- cbind(Model.Tentatif, nilaiAIC)
+colnames(PerbandinganModel) <- c("Model Tentatif", "Nilai AIC")
+PerbandinganModel <- as.data.frame(PerbandinganModel)
+PerbandinganModel
+```
+
+Model yang akan digunakan adalah model SARIMA(1,0,0)(0,1,1)7.
+
+# Overfitting Modelt Tentatif Terbaik
+
+Akan dilakukan *overfit* untuk model SARIMA(1,0,0)(0,1,1)7 pada komponden p, q, P, dan Q. Didapat model *overfit*nya adalah SARIMA(2,0,0)(0,1,1)7, SARIMA(1,0,1)(0,1,1)7, SARIMA(1,0,0)(1,1,1)7, dan SARIMA(1,0,0)(0,1,2)7
+
+```{r}
+overfit1 = Arima(mrtlattsbc,order=c(2,0,0),seasonal=c(0,1,1))
+summary(overfit1)
+lmtest::coeftest(overfit1)
+```
+
+```{r}
+overfit2 = Arima(mrtlattsbc,order=c(1,0,1),seasonal=c(0,1,1))
+summary(overfit2)
+lmtest::coeftest(overfit2)
+```
+
+```{r}
+overfit3 = Arima(mrtlattsbc,order=c(1,0,0),seasonal=c(1,1,1))
+summary(overfit3)
+lmtest::coeftest(overfit3)
+```
+
+```{r}
+overfit4 = Arima(mrtlattsbc,order=c(1,0,0),seasonal=c(0,1,2))
+summary(overfit4)
+lmtest::coeftest(overfit4)
+```
+
+Dari semua model *overfit* yang dibuat, tidak ada model yang semua parameternya signifikan, maka akan dilanjutkan dengan model SARIMA(1,0,0)(0,1,1)7.
+
+# Analisis Sisaan
+
+```{r}
+modelfix <- Arima(mrtlattsbc,order=c(1,0,0),seasonal=c(0,1,1))
+
+
+sisaan.model <- modelfix$residuals
+par(mfrow=c(2,2))
+car::qqPlot(sisaan.model)
+plot(c(1:length(sisaan.model)),sisaan.model)
+acf(sisaan.model)
+pacf(sisaan.model)
+par(mfrow = c(1,1))
+```
+
+Dari eksplorasi plot di atas, sisaanya model tidak menyebar normal, kemudian ragam dari sisaanya cenderung tidak homogen, dari plot ACF dan PACF terdapat lag yang signifikan, artinya mungkin terdapat autokorelasi pada sisaan. Perlu dilakukan uji formal untuk memvalidasi kesimpulan dari eksplorasi plot di atas.
+
+## Uji Formal Sisaan Model
+
+### Normalitas Sisaan
+
+```{r}
+ks.test(sisaan.model,"pnorm")
+shapiro.test(sisaan.model)
+nortest::ad.test(sisaan.model)
+```
+
+$H_0$ : Sisaan menyebar normal
+
+$H_1$ : Sisaan tidak menyebar normal
+
+Setelah melakukan 3 uji normalitas, ketiga uji menghasilkan kesimpulan yang sama, yakni sisaan tidak menyebar normal. Hal ini sama seperti eksplorasi yang dilakukan.
+
+### Autokorelasi
+
+```{r}
+Box.test(sisaan.model, type = "Ljung") 
+```
+
+$H_0$ : Sisaan saling bebas
+
+$H_1$ : Sisaan tidak tidak saling bebas
+
+Uji Ljung-Box menghasilkan nilai *p-value* sebesar 0.6774, yang mana lebih besar dari 0.05. Maka tak tolak H0, artinya pada tingkat kepercayaan 95%, dapat dinyatakan bahwa tidak ada autokorelasi pada sisaan model. Hal ini berbeda dengan eksplorasi yang dilakukan.
+
+```{r}
+Box.test((sisaan.model)^2, type = "Ljung")  
+```
+
+$H_0$ : Ragam sisaan homogen
+
+$H_1$ : Ragam sisaan tidak homogen
+
+Berdasarkan uji Ljung-Box terhadap sisaan kuadrat, didapat *p-value* sebesar 0.2073 yang lebih besar dari 0.05. Maka tak tolak H0, artinya pada tingkat kepercayaan 95%, dapat dinyatakan bahwa ragam sisaan homogen. Hal ini berbeda dari eksplorasi yang dilakukan.
+
+```{r}
+t.test(sisaan.model, mu = 0, conf.level = 0.95) 
+```
+
+$H_0$ : nilai tengah sisaan sama dengan 0
+
+$H_1$ : nilai tengah sisaan tidak sama dengan 0
+
+Berdasarkan uji t yang dilakukan, didapat nilai *p-value* sebesar 0.5695, yang mana lebih besar dari 0.05. Maka tak tolak H0, artinya pada tingkat 95%, dapat dinyatakan bahwa nilai tengah sisaan = 0.
+
+# Peramalan
+
+```{r}
+ramal.sarima = forecast::forecast(modelfix, h=45)
+ramal.sarima
+```
+
+# Transformasi Balik
+
+```{r}
+Hasilngedukun=InvBoxCox(ramal.sarima$mean, 2)
+```
+
+# Akurasi Data Latih
+
+```{r}
+accuracy(sqrt(modelfix$fitted),mrtlat)
+```
+
+
+# Akurasi Data Uji
+```{r}
+accuracy(Hasilngedukun,mrtuji)
+```
+
+Didapat nilai **MAPE** untuk data latih adalah sebesar 29.69, sedangkan nilai **MAPE** data uji adalah sebesari 42.4, yang mana kedua nilai **MAPE** ini jatuh ke dalam kategori layak(20-50)
